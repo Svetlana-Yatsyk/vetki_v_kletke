@@ -1,0 +1,329 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f4ef;
+  --panel: #ffffff;
+  --ink: #181614;
+  --muted: #6b645c;
+  --line: #d8d1c7;
+  --accent: #d51f2a;
+  --accent-dark: #9f1720;
+  --blue: #1f6fb2;
+  --green: #287b4b;
+  --cell: #fffaf2;
+  --cell-active: #fff1d6;
+  --cell-correct: #dff3e6;
+  --cell-wrong: #f8dddd;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 28px 0 40px;
+}
+
+.topbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.kicker {
+  margin: 0 0 4px;
+  color: var(--accent-dark);
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 64px);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.scorecard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+#score {
+  min-width: 56px;
+  font-size: 24px;
+  font-weight: 800;
+  text-align: right;
+}
+
+button {
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: white;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+button:hover {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.65fr) repeat(3, minmax(128px, 1fr));
+  grid-template-rows: minmax(96px, auto) repeat(3, minmax(118px, 1fr));
+  border: 1px solid var(--line);
+  background: var(--line);
+  gap: 1px;
+  min-width: 0;
+}
+
+.grid-cell,
+.clue-cell,
+.corner-cell {
+  min-width: 0;
+  padding: 14px;
+  background: var(--panel);
+}
+
+.corner-cell {
+  background: var(--ink);
+}
+
+.clue-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  color: var(--ink);
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.16;
+}
+
+.clue-cell.column {
+  border-top: 6px solid var(--blue);
+}
+
+.clue-cell.row {
+  border-left: 6px solid var(--green);
+}
+
+.grid-cell {
+  min-height: 118px;
+  background: var(--cell);
+  border: 0;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.grid-cell:hover,
+.grid-cell.active {
+  background: var(--cell-active);
+  outline: 3px solid #f1bd57;
+  outline-offset: -3px;
+}
+
+.grid-cell.correct {
+  background: var(--cell-correct);
+}
+
+.grid-cell.wrong {
+  background: var(--cell-wrong);
+}
+
+.answer-name {
+  display: block;
+  font-weight: 850;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.answer-line {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.cell-placeholder {
+  color: #9a9187;
+  font-weight: 800;
+}
+
+.side-panel {
+  position: sticky;
+  top: 20px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 18px;
+  border-radius: 8px;
+}
+
+.label {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.active-cell h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.search-box {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  font-weight: 750;
+}
+
+.search-box input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 12px;
+  background: #fffdf9;
+  color: var(--ink);
+}
+
+.search-box input:focus {
+  outline: 3px solid #f1bd57;
+  border-color: #b78020;
+}
+
+.suggestions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.suggestion {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffdf9;
+  color: var(--ink);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.suggestion:hover {
+  border-color: var(--blue);
+  background: #eef6ff;
+}
+
+.suggestion small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.message {
+  min-height: 24px;
+  margin: 14px 0 0;
+  color: var(--accent-dark);
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+@media (max-width: 900px) {
+  .topbar,
+  .game-layout {
+    display: grid;
+  }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .side-panel {
+    position: static;
+  }
+
+  .grid {
+    grid-template-columns: minmax(78px, 0.58fr) repeat(3, minmax(92px, 1fr));
+    grid-template-rows: minmax(86px, auto) repeat(3, minmax(96px, auto));
+  }
+
+  .grid-cell,
+  .clue-cell,
+  .corner-cell {
+    padding: 10px;
+  }
+
+  .clue-cell {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    width: min(100vw - 18px, 1180px);
+    padding-top: 18px;
+  }
+
+  .scorecard {
+    justify-content: space-between;
+  }
+
+  .grid {
+    grid-template-columns: 68px repeat(3, minmax(72px, 1fr));
+  }
+
+  .grid-cell {
+    min-height: 88px;
+  }
+
+  .answer-name {
+    font-size: 13px;
+  }
+
+  .answer-line {
+    font-size: 11px;
+  }
+}

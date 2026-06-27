@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ветки в клетке</title>
+    <link rel="stylesheet" href="src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="kicker">Московское метро</p>
+          <h1>Ветки в клетке</h1>
+        </div>
+        <div class="scorecard" aria-live="polite">
+          <span id="score">0/9</span>
+          <button id="newPuzzleButton" type="button">Новая сетка</button>
+        </div>
+      </header>
+
+      <section class="game-layout" aria-label="Игровая сетка">
+        <div id="grid" class="grid" role="grid"></div>
+        <aside class="side-panel" aria-label="Ввод ответа">
+          <div class="active-cell">
+            <p class="label">Активная клетка</p>
+            <h2 id="activeCellTitle">Выбери клетку</h2>
+            <p id="activeCellClues" class="muted">Затем начни вводить название станции.</p>
+          </div>
+
+          <label class="search-box">
+            <span>Станция</span>
+            <input id="stationSearch" type="search" autocomplete="off" placeholder="Например, Сокольники" />
+          </label>
+          <div id="suggestions" class="suggestions" role="listbox"></div>
+          <p id="message" class="message" aria-live="polite"></p>
+        </aside>
+      </section>
+    </main>
+
+    <script src="src/app.js" type="module"></script>
+  </body>
+</html>
