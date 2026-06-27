@@ -1,6 +1,8 @@
 const DATA_URL = "public/data/game-data.json";
 const MIN_CELL_ANSWERS = 3;
 const MAX_PUZZLE_ATTEMPTS = 5000;
+const MAX_MISTAKES = 3;
+const RULES_STORAGE_KEY = "vetki-rules-seen";
 
 const state = {
   data: null,
@@ -8,6 +10,8 @@ const state = {
   selected: null,
   answers: new Map(),
   intersectionCounts: new Map(),
+  mistakes: 0,
+  finished: false,
 };
 
 const grid = document.querySelector("#grid");
@@ -15,9 +19,13 @@ const searchInput = document.querySelector("#stationSearch");
 const suggestions = document.querySelector("#suggestions");
 const message = document.querySelector("#message");
 const score = document.querySelector("#score");
+const mistakes = document.querySelector("#mistakes");
 const activeCellTitle = document.querySelector("#activeCellTitle");
 const activeCellClues = document.querySelector("#activeCellClues");
 const newPuzzleButton = document.querySelector("#newPuzzleButton");
+const helpButton = document.querySelector("#helpButton");
+const rulesDialog = document.querySelector("#rulesDialog");
+const possibleAnswers = document.querySelector("#possibleAnswers");
 
 function normalize(value) {
   return String(value ?? "")
@@ -45,34 +53,101 @@ function createRng(seed) {
   };
 }
 
-function sample(items, count, rng) {
-  const pool = [...items];
-  const result = [];
-  while (pool.length && result.length < count) {
-    const index = Math.floor(rng() * pool.length);
-    result.push(pool.splice(index, 1)[0]);
-  }
-  return result;
+function clueGroup(clue) {
+  return clue.group === "type" ? "station_type" : clue.group;
 }
 
-function sampleUniqueGroups(items, count, rng, excludedGroups = new Set()) {
-  const groups = new Map();
-
-  for (const item of items) {
-    if (excludedGroups.has(item.group)) continue;
-    if (!groups.has(item.group)) {
-      groups.set(item.group, []);
-    }
-    groups.get(item.group).push(item);
+function lineNameForConditionParts(label) {
+  const name = label.replace(/\s+линия$/i, "").trim();
+  if (name === "Московское центральное кольцо") {
+    return ["На", "Московском центральном", "кольце"];
   }
 
-  const selectedGroups = sample([...groups.keys()], count, rng);
-  if (selectedGroups.length < count) return [];
+  const inflected = name
+    .split(" ")
+    .map((word) => word.replace(/ая$/u, "ой").replace(/яя$/u, "ей"))
+    .join(" ");
+  return ["На", inflected, "ветке"];
+}
 
-  return selectedGroups.map((group) => {
-    const groupItems = groups.get(group);
-    return groupItems[Math.floor(rng() * groupItems.length)];
-  });
+function lineNameForCondition(label) {
+  return lineNameForConditionParts(label).join(" ");
+}
+
+function clueLabel(clue) {
+  if (clueGroup(clue) === "line") {
+    return lineNameForCondition(clue.label);
+  }
+  return clue.label;
+}
+
+function clueWeight(clue) {
+  const group = clueGroup(clue);
+  if (group === "line") return 7;
+  if (group === "station_type") return 0.18;
+  if (group === "depth") return 0.7;
+  if (group === "station_group") return 0.8;
+  return 1.25;
+}
+
+function groupLimit(group) {
+  if (group === "line") return 3;
+  return 1;
+}
+
+function buildGroupCounts(selected) {
+  const counts = new Map();
+  for (const clue of selected) {
+    const group = clueGroup(clue);
+    counts.set(group, (counts.get(group) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function canUseClue(clue, selected, groupCounts) {
+  const group = clueGroup(clue);
+  if (selected.some((item) => item.id === clue.id)) return false;
+  return (groupCounts.get(group) ?? 0) < groupLimit(group);
+}
+
+function pickWeighted(candidates, rng) {
+  const total = candidates.reduce((sum, clue) => sum + clueWeight(clue), 0);
+  let roll = rng() * total;
+  for (const clue of candidates) {
+    roll -= clueWeight(clue);
+    if (roll <= 0) return clue;
+  }
+  return candidates.at(-1);
+}
+
+function selectAxisClues(clues, count, rng, selected, options = {}) {
+  const result = [];
+  const groupCounts = buildGroupCounts(selected);
+  const lineTarget = options.lineTarget ?? 0;
+
+  while (result.filter((clue) => clueGroup(clue) === "line").length < lineTarget) {
+    const candidates = clues.filter(
+      (clue) => clueGroup(clue) === "line" && canUseClue(clue, [...selected, ...result], groupCounts),
+    );
+    if (!candidates.length) return [];
+    const clue = pickWeighted(candidates, rng);
+    result.push(clue);
+    groupCounts.set("line", (groupCounts.get("line") ?? 0) + 1);
+  }
+
+  while (result.length < count) {
+    const candidates = clues.filter((clue) => {
+      if (options.excludeLines && clueGroup(clue) === "line") return false;
+      return canUseClue(clue, [...selected, ...result], groupCounts);
+    });
+    if (!candidates.length) return [];
+    const clue = pickWeighted(candidates, rng);
+    result.push(clue);
+    const group = clueGroup(clue);
+    groupCounts.set(group, (groupCounts.get(group) ?? 0) + 1);
+  }
+
+  return result;
 }
 
 function stationMatchesClue(station, clue) {
@@ -94,8 +169,8 @@ function intersectionCount(rowClue, columnClue) {
 
 function isUsablePuzzle(rows, columns) {
   const allClues = [...rows, ...columns];
-  const groups = new Set(allClues.map((clue) => clue.group));
-  if (groups.size !== allClues.length) return false;
+  const ids = new Set(allClues.map((clue) => clue.id));
+  if (ids.size !== allClues.length) return false;
 
   for (const row of rows) {
     for (const column of columns) {
@@ -112,10 +187,19 @@ function buildPuzzle(seedText = new Date().toISOString().slice(0, 10)) {
   const clues = state.data.clues.filter((clue) => clue.count >= minCellAnswers && clue.count <= 180);
 
   for (let attempt = 0; attempt < MAX_PUZZLE_ATTEMPTS; attempt += 1) {
-    const rows = sampleUniqueGroups(clues, 3, rng);
-    const rowGroups = new Set(rows.map((row) => row.group));
-    const columnPool = clues.filter((clue) => !rows.some((row) => row.id === clue.id));
-    const columns = sampleUniqueGroups(columnPool, 3, rng, rowGroups);
+    const lineAxis = rng() < 0.5 ? "rows" : "columns";
+    const lineTarget = rng() < 0.75 ? 2 : 3;
+    let rows = [];
+    let columns = [];
+
+    if (lineAxis === "rows") {
+      rows = selectAxisClues(clues, 3, rng, [], { lineTarget });
+      columns = selectAxisClues(clues, 3, rng, rows, { excludeLines: true });
+    } else {
+      columns = selectAxisClues(clues, 3, rng, [], { lineTarget });
+      rows = selectAxisClues(clues, 3, rng, columns, { excludeLines: true });
+    }
+
     if (isUsablePuzzle(rows, columns)) {
       return { id: seedText, rows, columns };
     }
@@ -133,11 +217,11 @@ function renderGrid() {
   grid.append(createCell("corner-cell", ""));
 
   for (const clue of state.puzzle.columns) {
-    grid.append(createCell("clue-cell column", clue.label));
+    grid.append(createClueCell("column", clue));
   }
 
   state.puzzle.rows.forEach((rowClue, rowIndex) => {
-    grid.append(createCell("clue-cell row", rowClue.label));
+    grid.append(createClueCell("row", rowClue));
     state.puzzle.columns.forEach((columnClue, columnIndex) => {
       const key = `${rowIndex}:${columnIndex}`;
       const button = document.createElement("button");
@@ -149,6 +233,9 @@ function renderGrid() {
       button.setAttribute("role", "gridcell");
       button.addEventListener("click", () => selectCell(rowIndex, columnIndex));
       renderAnswer(button, key);
+      if (state.finished && !state.answers.has(key)) {
+        button.classList.add("revealed");
+      }
       grid.append(button);
     });
   });
@@ -160,6 +247,22 @@ function createCell(className, text) {
   const element = document.createElement("div");
   element.className = className;
   element.textContent = text;
+  return element;
+}
+
+function createClueCell(axis, clue) {
+  const element = document.createElement("div");
+  element.className = `clue-cell ${axis}${clueGroup(clue) === "line" ? " line-clue" : ""}`;
+  if (clueGroup(clue) === "line") {
+    for (const part of lineNameForConditionParts(clue.label)) {
+      const line = document.createElement("span");
+      line.textContent = part;
+      element.append(line);
+    }
+    return element;
+  }
+
+  element.textContent = clue.label;
   return element;
 }
 
@@ -177,15 +280,30 @@ function renderAnswer(button, key) {
 }
 
 function selectCell(rowIndex, columnIndex) {
+  const key = `${rowIndex}:${columnIndex}`;
   state.selected = { rowIndex, columnIndex };
   document.querySelectorAll(".grid-cell").forEach((cell) => cell.classList.remove("active"));
-  const active = document.querySelector(`[data-key="${rowIndex}:${columnIndex}"]`);
+  const active = document.querySelector(`[data-key="${key}"]`);
   active?.classList.add("active");
 
   const rowClue = state.puzzle.rows[rowIndex];
   const columnClue = state.puzzle.columns[columnIndex];
   activeCellTitle.textContent = `Строка ${rowIndex + 1}, столбец ${columnIndex + 1}`;
-  activeCellClues.textContent = `${rowClue.label} + ${columnClue.label}`;
+  activeCellClues.textContent = `${clueLabel(rowClue)} + ${clueLabel(columnClue)}`;
+  possibleAnswers.hidden = true;
+
+  if (state.finished) {
+    searchInput.value = "";
+    suggestions.innerHTML = "";
+    showPossibleAnswers(rowIndex, columnIndex);
+    return;
+  }
+
+  if (state.answers.has(key)) {
+    message.textContent = "Эта клетка уже заполнена.";
+    return;
+  }
+
   searchInput.value = "";
   suggestions.innerHTML = "";
   message.textContent = "";
@@ -194,12 +312,16 @@ function selectCell(rowIndex, columnIndex) {
 
 function showSuggestions() {
   suggestions.innerHTML = "";
+  if (state.finished) return;
   const query = normalize(searchInput.value);
   if (!query || query.length < 2) return;
 
   const usedIds = new Set([...state.answers.values()].map((station) => station.id));
+  const usedGroups = new Set([...state.answers.values()].map((station) => station.groupId));
   const matches = state.data.stations
-    .filter((station) => !usedIds.has(station.id) && station.searchText.includes(query))
+    .filter(
+      (station) => !usedIds.has(station.id) && !usedGroups.has(station.groupId) && station.searchText.includes(query),
+    )
     .slice(0, 8);
 
   for (const station of matches) {
@@ -213,6 +335,11 @@ function showSuggestions() {
 }
 
 function submitStation(station) {
+  if (state.finished) {
+    message.textContent = "Партия уже завершена.";
+    return;
+  }
+
   if (!state.selected) {
     message.textContent = "Сначала выбери клетку.";
     return;
@@ -224,15 +351,29 @@ function submitStation(station) {
     return;
   }
 
+  const usedStation = [...state.answers.values()].some(
+    (answer) => answer.id === station.id || answer.groupId === station.groupId,
+  );
+  if (usedStation) {
+    message.textContent = "Эта станция уже использована.";
+    return;
+  }
+
   const rowClue = state.puzzle.rows[state.selected.rowIndex];
   const columnClue = state.puzzle.columns[state.selected.columnIndex];
   const ok = stationMatchesClue(station, rowClue) && stationMatchesClue(station, columnClue);
 
   if (!ok) {
-    message.textContent = "Не подходит под оба условия.";
+    state.mistakes += 1;
+    message.textContent =
+      state.mistakes >= MAX_MISTAKES ? "Третья ошибка. Партия завершена." : "Не подходит под оба условия.";
+    updateScore();
     const active = document.querySelector(`[data-key="${key}"]`);
     active?.classList.add("wrong");
     setTimeout(() => active?.classList.remove("wrong"), 650);
+    if (state.mistakes >= MAX_MISTAKES) {
+      finishPuzzle(false);
+    }
     return;
   }
 
@@ -253,18 +394,72 @@ function selectNextCell() {
   }
   state.selected = null;
   activeCellTitle.textContent = "Сетка заполнена";
-  activeCellClues.textContent = "Можно попробовать новую тренировочную сетку.";
+  activeCellClues.textContent = "Теперь можно нажимать на клетки и смотреть возможные ответы.";
+  finishPuzzle(true);
 }
 
 function updateScore() {
   score.textContent = `${state.answers.size}/9`;
+  mistakes.textContent = `Ошибки ${state.mistakes}/${MAX_MISTAKES}`;
+}
+
+function finishPuzzle(won) {
+  state.finished = true;
+  state.selected = null;
+  searchInput.disabled = true;
+  suggestions.innerHTML = "";
+  renderGrid();
+  message.textContent = won
+    ? "Готово! Нажимай на клетки, чтобы посмотреть другие возможные ответы."
+    : "Партия закончилась. Нажимай на клетки, чтобы посмотреть возможные ответы.";
+  if (!won) {
+    activeCellTitle.textContent = "Партия завершена";
+    activeCellClues.textContent = "Три ошибки уже использованы.";
+  }
+}
+
+function matchingStations(rowIndex, columnIndex) {
+  const rowClue = state.puzzle.rows[rowIndex];
+  const columnClue = state.puzzle.columns[columnIndex];
+  return state.data.stations.filter(
+    (station) => stationMatchesClue(station, rowClue) && stationMatchesClue(station, columnClue),
+  );
+}
+
+function showPossibleAnswers(rowIndex, columnIndex) {
+  const stations = matchingStations(rowIndex, columnIndex);
+  const answer = state.answers.get(`${rowIndex}:${columnIndex}`);
+  const title = answer ? `Подходит: ${answer.nameRu}` : "Возможные ответы";
+  possibleAnswers.innerHTML = `
+    <h3>${title}</h3>
+    <ul>
+      ${stations
+        .slice(0, 16)
+        .map((station) => `<li>${station.nameRu}<span>${station.lineNameRu}</span></li>`)
+        .join("")}
+    </ul>
+  `;
+  possibleAnswers.hidden = false;
+  message.textContent =
+    stations.length > 16 ? `Показаны первые 16 вариантов из ${stations.length}.` : `${stations.length} вариантов.`;
 }
 
 function startPuzzle(seedText) {
   state.puzzle = buildPuzzle(seedText);
   state.answers.clear();
+  state.mistakes = 0;
+  state.finished = false;
+  searchInput.disabled = false;
+  possibleAnswers.hidden = true;
+  message.textContent = "";
   renderGrid();
   selectCell(0, 0);
+}
+
+function showRules() {
+  if (rulesDialog?.showModal) {
+    rulesDialog.showModal();
+  }
 }
 
 async function init() {
@@ -272,10 +467,15 @@ async function init() {
   if (!response.ok) throw new Error(`Не удалось загрузить ${DATA_URL}`);
   state.data = await response.json();
   startPuzzle(new Date().toISOString().slice(0, 10));
+  if (!localStorage.getItem(RULES_STORAGE_KEY)) {
+    showRules();
+    localStorage.setItem(RULES_STORAGE_KEY, "1");
+  }
 }
 
 searchInput.addEventListener("input", showSuggestions);
 newPuzzleButton.addEventListener("click", () => startPuzzle(`training-${Date.now()}`));
+helpButton.addEventListener("click", showRules);
 
 init().catch((error) => {
   message.textContent = "Не удалось загрузить данные. Запусти scripts/build_game_data.py.";

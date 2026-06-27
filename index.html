@@ -14,7 +14,11 @@
           <h1>Ветки в клетке</h1>
         </div>
         <div class="scorecard" aria-live="polite">
-          <span id="score">0/9</span>
+          <div class="score-stack">
+            <span id="score">0/9</span>
+            <span id="mistakes">Ошибки 0/3</span>
+          </div>
+          <button id="helpButton" class="secondary-button" type="button">Правила</button>
           <button id="newPuzzleButton" type="button">Новая сетка</button>
         </div>
       </header>
@@ -24,8 +28,8 @@
         <aside class="side-panel" aria-label="Ввод ответа">
           <div class="active-cell">
             <p class="label">Активная клетка</p>
-            <h2 id="activeCellTitle">Выбери клетку</h2>
-            <p id="activeCellClues" class="muted">Затем начни вводить название станции.</p>
+            <h2 id="activeCellTitle">Выберите клетку</h2>
+            <p id="activeCellClues" class="muted">Затем начните вводить название станции.</p>
           </div>
 
           <label class="search-box">
@@ -34,9 +38,25 @@
           </label>
           <div id="suggestions" class="suggestions" role="listbox"></div>
           <p id="message" class="message" aria-live="polite"></p>
+          <div id="possibleAnswers" class="possible-answers" hidden></div>
         </aside>
       </section>
     </main>
+
+    <dialog id="rulesDialog" class="rules-dialog" aria-labelledby="rulesTitle">
+      <form method="dialog" class="rules-card">
+        <button class="icon-button close-button" value="close" aria-label="Закрыть правила" type="submit">×</button>
+        <p class="kicker">Как играть</p>
+        <ul>
+          <li>Цель игры — заполнить 9 клеток станциями московского метро, которые подходят и к условию строки, и к условию столбца.</li>
+          <li>За одну партию можно ошибиться не больше 3 раз.</li>
+          <li>Если вы уже использовали какую-то станцию, её нельзя ни удалить, ни использовать ещё раз.</li>
+          <li>После завершения партии можно понажимать на клетки и посмотреть возможные ответы.</li>
+          <li>В перспективе новая сетка будет появляться каждый день, а пока их можно генерить кнопкой "Новая сетка".</li>
+        </ul>
+        <button class="rules-start" value="close" type="submit">Играть</button>
+      </form>
+    </dialog>
 
     <script src="src/app.js" type="module"></script>
   </body>
