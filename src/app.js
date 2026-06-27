@@ -1,10 +1,13 @@
 const DATA_URL = "public/data/game-data.json";
+const MIN_CELL_ANSWERS = 3;
+const MAX_PUZZLE_ATTEMPTS = 5000;
 
 const state = {
   data: null,
   puzzle: null,
   selected: null,
   answers: new Map(),
+  intersectionCounts: new Map(),
 };
 
 const grid = document.querySelector("#grid");
@@ -52,35 +55,67 @@ function sample(items, count, rng) {
   return result;
 }
 
+function sampleUniqueGroups(items, count, rng, excludedGroups = new Set()) {
+  const groups = new Map();
+
+  for (const item of items) {
+    if (excludedGroups.has(item.group)) continue;
+    if (!groups.has(item.group)) {
+      groups.set(item.group, []);
+    }
+    groups.get(item.group).push(item);
+  }
+
+  const selectedGroups = sample([...groups.keys()], count, rng);
+  if (selectedGroups.length < count) return [];
+
+  return selectedGroups.map((group) => {
+    const groupItems = groups.get(group);
+    return groupItems[Math.floor(rng() * groupItems.length)];
+  });
+}
+
 function stationMatchesClue(station, clue) {
   return station.tags.includes(clue.id);
 }
 
 function intersectionCount(rowClue, columnClue) {
-  return state.data.stations.filter(
+  const key = `${rowClue.id}|${columnClue.id}`;
+  if (state.intersectionCounts.has(key)) {
+    return state.intersectionCounts.get(key);
+  }
+
+  const count = state.data.stations.filter(
     (station) => stationMatchesClue(station, rowClue) && stationMatchesClue(station, columnClue),
   ).length;
+  state.intersectionCounts.set(key, count);
+  return count;
 }
 
 function isUsablePuzzle(rows, columns) {
+  const allClues = [...rows, ...columns];
+  const groups = new Set(allClues.map((clue) => clue.group));
+  if (groups.size !== allClues.length) return false;
+
   for (const row of rows) {
     for (const column of columns) {
       const count = intersectionCount(row, column);
-      if (count < 1 || count > 80) return false;
+      if (count < MIN_CELL_ANSWERS || count > 80) return false;
     }
   }
-  const groups = new Set([...rows, ...columns].map((clue) => clue.group));
-  return groups.size >= 3;
+  return true;
 }
 
 function buildPuzzle(seedText = new Date().toISOString().slice(0, 10)) {
   const rng = createRng(hashString(seedText));
-  const clues = state.data.clues.filter((clue) => clue.count >= 4 && clue.count <= 180);
+  const minCellAnswers = state.data.meta?.minCellAnswerCount ?? MIN_CELL_ANSWERS;
+  const clues = state.data.clues.filter((clue) => clue.count >= minCellAnswers && clue.count <= 180);
 
-  for (let attempt = 0; attempt < 800; attempt += 1) {
-    const rows = sample(clues, 3, rng);
+  for (let attempt = 0; attempt < MAX_PUZZLE_ATTEMPTS; attempt += 1) {
+    const rows = sampleUniqueGroups(clues, 3, rng);
+    const rowGroups = new Set(rows.map((row) => row.group));
     const columnPool = clues.filter((clue) => !rows.some((row) => row.id === clue.id));
-    const columns = sample(columnPool, 3, rng);
+    const columns = sampleUniqueGroups(columnPool, 3, rng, rowGroups);
     if (isUsablePuzzle(rows, columns)) {
       return { id: seedText, rows, columns };
     }
