@@ -2,7 +2,7 @@ const DATA_URL = "public/data/game-data.json";
 const MIN_CELL_ANSWERS = 3;
 const MAX_PUZZLE_ATTEMPTS = 5000;
 const MAX_MISTAKES = 3;
-const RULES_STORAGE_KEY = "vetki-rules-seen";
+const RULES_STORAGE_KEY = "vetki-rules-seen-v2";
 
 const state = {
   data: null,
