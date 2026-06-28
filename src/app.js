@@ -2,6 +2,7 @@ const DATA_URL = "public/data/game-data.json";
 const MIN_CELL_ANSWERS = 3;
 const MAX_PUZZLE_ATTEMPTS = 5000;
 const MAX_MISTAKES = 3;
+const MAX_LINE_CLUES = 2;
 const RULES_STORAGE_KEY = "vetki-rules-seen-v2";
 
 const state = {
@@ -20,12 +21,14 @@ const suggestions = document.querySelector("#suggestions");
 const message = document.querySelector("#message");
 const score = document.querySelector("#score");
 const mistakes = document.querySelector("#mistakes");
+const puzzleDate = document.querySelector("#puzzleDate");
 const activeCellTitle = document.querySelector("#activeCellTitle");
 const activeCellClues = document.querySelector("#activeCellClues");
 const newPuzzleButton = document.querySelector("#newPuzzleButton");
 const helpButton = document.querySelector("#helpButton");
 const rulesDialog = document.querySelector("#rulesDialog");
 const possibleAnswers = document.querySelector("#possibleAnswers");
+const resultPanel = document.querySelector("#resultPanel");
 
 function normalize(value) {
   return String(value ?? "")
@@ -91,7 +94,7 @@ function clueWeight(clue) {
 }
 
 function groupLimit(group) {
-  if (group === "line") return 3;
+  if (group === "line") return MAX_LINE_CLUES;
   return 1;
 }
 
@@ -188,7 +191,7 @@ function buildPuzzle(seedText = new Date().toISOString().slice(0, 10)) {
 
   for (let attempt = 0; attempt < MAX_PUZZLE_ATTEMPTS; attempt += 1) {
     const lineAxis = rng() < 0.5 ? "rows" : "columns";
-    const lineTarget = rng() < 0.75 ? 2 : 3;
+    const lineTarget = MAX_LINE_CLUES;
     let rows = [];
     let columns = [];
 
@@ -317,11 +320,8 @@ function showSuggestions() {
   if (!query || query.length < 2) return;
 
   const usedIds = new Set([...state.answers.values()].map((station) => station.id));
-  const usedGroups = new Set([...state.answers.values()].map((station) => station.groupId));
   const matches = state.data.stations
-    .filter(
-      (station) => !usedIds.has(station.id) && !usedGroups.has(station.groupId) && station.searchText.includes(query),
-    )
+    .filter((station) => !usedIds.has(station.id) && station.searchText.includes(query))
     .slice(0, 8);
 
   for (const station of matches) {
@@ -351,11 +351,9 @@ function submitStation(station) {
     return;
   }
 
-  const usedStation = [...state.answers.values()].some(
-    (answer) => answer.id === station.id || answer.groupId === station.groupId,
-  );
+  const usedStation = [...state.answers.values()].some((answer) => answer.id === station.id);
   if (usedStation) {
-    message.textContent = "Эта станция уже использована.";
+    message.textContent = "Эта станция на этой линии уже использована.";
     return;
   }
 
@@ -409,13 +407,40 @@ function finishPuzzle(won) {
   searchInput.disabled = true;
   suggestions.innerHTML = "";
   renderGrid();
-  message.textContent = won
-    ? "Готово! Нажимай на клетки, чтобы посмотреть другие возможные ответы."
-    : "Партия закончилась. Нажимай на клетки, чтобы посмотреть возможные ответы.";
+  renderResult(won);
+  message.textContent = won ? "Поздравляем, сетка собрана!" : "Партия закончилась.";
   if (!won) {
     activeCellTitle.textContent = "Партия завершена";
     activeCellClues.textContent = "Три ошибки уже использованы.";
   }
+}
+
+function gridRating() {
+  const completionScore = (state.answers.size / 9) * 100;
+  const mistakePenalty = state.mistakes * 10;
+  return Math.max(0, Math.round(completionScore - mistakePenalty));
+}
+
+function ratingTitle(rating, won) {
+  if (!won) return "Есть куда разогнаться";
+  if (rating >= 95) return "Блестящая сетка";
+  if (rating >= 80) return "Очень сильная сетка";
+  if (rating >= 65) return "Уверенная победа";
+  return "Победа";
+}
+
+function renderResult(won) {
+  const rating = gridRating();
+  resultPanel.innerHTML = `
+    <h3>${ratingTitle(rating, won)}</h3>
+    <p>${won ? "Поздравляем! Вы заполнили все 9 клеток." : "Можно открыть возможные ответы и попробовать новую сетку."}</p>
+    <dl>
+      <div><dt>Оценка сетки</dt><dd>${rating}</dd></div>
+      <div><dt>Заполнено</dt><dd>${state.answers.size}/9</dd></div>
+      <div><dt>Ошибки</dt><dd>${state.mistakes}/${MAX_MISTAKES}</dd></div>
+    </dl>
+  `;
+  resultPanel.hidden = false;
 }
 
 function matchingStations(rowIndex, columnIndex) {
@@ -451,9 +476,32 @@ function startPuzzle(seedText) {
   state.finished = false;
   searchInput.disabled = false;
   possibleAnswers.hidden = true;
+  resultPanel.hidden = true;
+  resultPanel.innerHTML = "";
   message.textContent = "";
   renderGrid();
+  renderPuzzleDate(seedText);
   selectCell(0, 0);
+}
+
+function formatDate(seedText) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(seedText);
+  if (!match) return "";
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(date);
+}
+
+function localDateSeed(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function renderPuzzleDate(seedText) {
+  const dateText = formatDate(seedText);
+  puzzleDate.textContent = dateText ? `Сетка ${dateText}` : "Тренировочная сетка";
 }
 
 function showRules() {
@@ -466,7 +514,7 @@ async function init() {
   const response = await fetch(DATA_URL);
   if (!response.ok) throw new Error(`Не удалось загрузить ${DATA_URL}`);
   state.data = await response.json();
-  startPuzzle(new Date().toISOString().slice(0, 10));
+  startPuzzle(localDateSeed());
   if (!localStorage.getItem(RULES_STORAGE_KEY)) {
     showRules();
     localStorage.setItem(RULES_STORAGE_KEY, "1");

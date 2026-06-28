@@ -65,6 +65,12 @@ h1 {
   letter-spacing: 0;
 }
 
+.puzzle-date {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 750;
+}
+
 .scorecard {
   display: flex;
   align-items: center;
@@ -327,6 +333,49 @@ button:hover {
   line-height: 1.35;
 }
 
+.result-panel {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--soft-line);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.result-panel h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.result-panel p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.result-panel dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.result-panel div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.result-panel dt {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.result-panel dd {
+  margin: 0;
+  font-weight: 850;
+}
+
 .possible-answers {
   margin-top: 18px;
   padding-top: 16px;
@@ -425,6 +474,63 @@ button:hover {
   width: 100%;
 }
 
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 28px;
+}
+
+.info-grid article {
+  min-width: 0;
+}
+
+.info-grid h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+details {
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+
+details:last-of-type {
+  border-bottom: 1px solid var(--line);
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+details p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.changelog-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.changelog-list li {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.changelog-list time {
+  color: var(--ink);
+  font-weight: 850;
+}
+
 @media (max-width: 900px) {
   .topbar,
   .game-layout {
@@ -432,6 +538,10 @@ button:hover {
   }
 
   .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .info-grid {
     grid-template-columns: 1fr;
   }
 

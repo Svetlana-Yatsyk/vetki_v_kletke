@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Ветки в клетке</title>
-    <link rel="stylesheet" href="src/styles.css?v=2026-06-27-2" />
+    <link rel="stylesheet" href="src/styles.css?v=2026-06-28-1" />
   </head>
   <body>
     <main class="app-shell">
@@ -12,6 +12,7 @@
         <div>
           <p class="kicker">Московское метро</p>
           <h1>Ветки в клетке</h1>
+          <p id="puzzleDate" class="puzzle-date">Сетка загружается</p>
         </div>
         <div class="scorecard" aria-live="polite">
           <div class="score-stack">
@@ -38,8 +39,31 @@
           </label>
           <div id="suggestions" class="suggestions" role="listbox"></div>
           <p id="message" class="message" aria-live="polite"></p>
+          <div id="resultPanel" class="result-panel" hidden></div>
           <div id="possibleAnswers" class="possible-answers" hidden></div>
         </aside>
+      </section>
+
+      <section class="info-grid" aria-label="Информация об игре">
+        <article>
+          <h2>FAQ</h2>
+          <details>
+            <summary>Что считается правильным ответом?</summary>
+            <p>Станция должна одновременно подходить к условию строки и условию столбца.</p>
+          </details>
+          <details>
+            <summary>Можно ли использовать пересадочную станцию дважды?</summary>
+            <p>Можно, если это разные линии. Например, Киевская на Арбатско-Покровской и Киевская на Филёвской считаются разными ответами.</p>
+          </details>
+        </article>
+
+        <article>
+          <h2>Changelog</h2>
+          <ul class="changelog-list">
+            <li><time datetime="2026-06-28">28.06.2026</time> Добавлены дата сетки, FAQ, changelog и итоговая оценка.</li>
+            <li><time datetime="2026-06-27">27.06.2026</time> Добавлены правила, лимит ошибок и обновлённый дизайн.</li>
+          </ul>
+        </article>
       </section>
     </main>
 
@@ -49,15 +73,16 @@
         <p class="kicker">Как играть</p>
         <ul>
           <li>Цель игры — заполнить 9 клеток станциями московского метро, которые подходят и к условию строки, и к условию столбца.</li>
+          <li>В выборку входят все станции московского метро, Большая кольцевая линия и МЦК. **Монорельс, МЦД и строящиеся станции не входят**.</li>
           <li>За одну партию можно ошибиться не больше 3 раз.</li>
-          <li>Если вы уже использовали какую-то станцию, её нельзя ни удалить, ни использовать ещё раз.</li>
+          <li>Если станция уже поставлена в сетку, её нельзя удалить. Тот же вариант станции на той же линии нельзя использовать ещё раз.</li>
           <li>После завершения партии можно понажимать на клетки и посмотреть возможные ответы.</li>
-          <li>В перспективе новая сетка будет появляться каждый день, а пока их можно генерить кнопкой "Новая сетка".</li>
+          <li>Новая ежедневная сетка появляется каждый день, а кнопка «Новая сетка» создаёт тренировочную сетку.</li>
         </ul>
         <button class="rules-start" value="close" type="submit">Играть</button>
       </form>
     </dialog>
 
-    <script src="src/app.js?v=2026-06-27-2" type="module"></script>
+    <script src="src/app.js?v=2026-06-28-1" type="module"></script>
   </body>
 </html>
