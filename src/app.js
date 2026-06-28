@@ -329,7 +329,10 @@ function showSuggestions() {
 
   const usedIds = new Set([...state.answers.values()].map((station) => station.id));
   const matches = state.data.stations
-    .filter((station) => !usedIds.has(station.id) && station.searchText.includes(query))
+    .filter((station) => {
+      const stationSearchText = normalize([station.nameRu, station.nameEn].join(" "));
+      return !usedIds.has(station.id) && stationSearchText.includes(query);
+    })
     .slice(0, 8);
 
   for (const station of matches) {

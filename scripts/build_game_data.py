@@ -147,7 +147,7 @@ def build_station(row: dict[str, str], attributes: list[str]) -> dict[str, Any]:
         "lineNameEn": row.get("line_name_en", ""),
         "lineColor": "",
         "tags": station_tags(row, attributes),
-        "searchText": normalize(" ".join([row.get("name_ru", ""), row.get("name_en", ""), row.get("line_name_ru", "")])),
+        "searchText": normalize(" ".join([row.get("name_ru", ""), row.get("name_en", "")])),
     }
 
 
