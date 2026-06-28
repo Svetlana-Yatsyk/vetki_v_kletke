@@ -3,7 +3,13 @@ const MIN_CELL_ANSWERS = 3;
 const MAX_PUZZLE_ATTEMPTS = 5000;
 const MAX_MISTAKES = 3;
 const MAX_LINE_CLUES = 2;
+const TRAINING_PUZZLE_LIMIT = 2;
 const RULES_STORAGE_KEY = "vetki-rules-seen-v2";
+const GAME_STORAGE_KEY = "vetki-game-state-v1";
+const SHARE_URL = "https://svetlana-yatsyk.github.io/vetki_v_kletke/";
+const ARCHIVE_START_DATE = "2026-06-28";
+const DAILY_ROLLOVER_HOUR = 12;
+const DAILY_TIME_ZONE = "Europe/Moscow";
 
 const state = {
   data: null,
@@ -13,6 +19,7 @@ const state = {
   intersectionCounts: new Map(),
   mistakes: 0,
   finished: false,
+  trainingPuzzlesUsed: 0,
 };
 
 const grid = document.querySelector("#grid");
@@ -29,6 +36,7 @@ const helpButton = document.querySelector("#helpButton");
 const rulesDialog = document.querySelector("#rulesDialog");
 const possibleAnswers = document.querySelector("#possibleAnswers");
 const resultPanel = document.querySelector("#resultPanel");
+const archiveList = document.querySelector("#archiveList");
 
 function normalize(value) {
   return String(value ?? "")
@@ -371,6 +379,8 @@ function submitStation(station) {
     setTimeout(() => active?.classList.remove("wrong"), 650);
     if (state.mistakes >= MAX_MISTAKES) {
       finishPuzzle(false);
+    } else {
+      saveGameState();
     }
     return;
   }
@@ -379,6 +389,7 @@ function submitStation(station) {
   message.textContent = "Есть!";
   renderGrid();
   selectNextCell();
+  saveGameState();
 }
 
 function selectNextCell() {
@@ -399,6 +410,15 @@ function selectNextCell() {
 function updateScore() {
   score.textContent = `${state.answers.size}/9`;
   mistakes.textContent = `Ошибки ${state.mistakes}/${MAX_MISTAKES}`;
+  updateTrainingButton();
+}
+
+function updateTrainingButton() {
+  const remaining = TRAINING_PUZZLE_LIMIT - state.trainingPuzzlesUsed;
+  newPuzzleButton.disabled = remaining <= 0;
+  newPuzzleButton.textContent = remaining <= 0 ? "Лимит исчерпан" : "Поиграть ещё";
+  newPuzzleButton.title =
+    remaining <= 0 ? "Сегодня уже использованы две тренировочные сетки." : `Осталось тренировочных сеток: ${remaining}`;
 }
 
 function finishPuzzle(won) {
@@ -408,39 +428,64 @@ function finishPuzzle(won) {
   suggestions.innerHTML = "";
   renderGrid();
   renderResult(won);
-  message.textContent = won ? "Поздравляем, сетка собрана!" : "Партия закончилась.";
+  message.textContent = won ? "Ура, сетка собрана!" : "Партия закончилась.";
   if (!won) {
     activeCellTitle.textContent = "Партия завершена";
     activeCellClues.textContent = "Три ошибки уже использованы.";
   }
-}
-
-function gridRating() {
-  const completionScore = (state.answers.size / 9) * 100;
-  const mistakePenalty = state.mistakes * 10;
-  return Math.max(0, Math.round(completionScore - mistakePenalty));
-}
-
-function ratingTitle(rating, won) {
-  if (!won) return "Есть куда разогнаться";
-  if (rating >= 95) return "Блестящая сетка";
-  if (rating >= 80) return "Очень сильная сетка";
-  if (rating >= 65) return "Уверенная победа";
-  return "Победа";
+  saveGameState();
 }
 
 function renderResult(won) {
-  const rating = gridRating();
-  resultPanel.innerHTML = `
-    <h3>${ratingTitle(rating, won)}</h3>
-    <p>${won ? "Поздравляем! Вы заполнили все 9 клеток." : "Можно открыть возможные ответы и попробовать новую сетку."}</p>
-    <dl>
-      <div><dt>Оценка сетки</dt><dd>${rating}</dd></div>
-      <div><dt>Заполнено</dt><dd>${state.answers.size}/9</dd></div>
-      <div><dt>Ошибки</dt><dd>${state.mistakes}/${MAX_MISTAKES}</dd></div>
-    </dl>
-  `;
+  const perfectBadge = won && state.mistakes === 0 ? '<p class="perfect-badge">Идеальная сетка</p>' : "";
+  if (won) {
+    resultPanel.innerHTML = `
+      <h3>Победа!</h3>
+      ${perfectBadge}
+      <p>Отличный результат. Возвращайтесь завтра за новой сеткой и расскажите про игру друзьям.</p>
+      <dl>
+        <div><dt>Ошибки</dt><dd>${state.mistakes}/${MAX_MISTAKES}</dd></div>
+      </dl>
+      <button class="share-button" type="button" data-share-result>Поделиться</button>
+    `;
+  } else {
+    resultPanel.innerHTML = `
+      <h3>Есть куда стремиться</h3>
+      <p>Можно открыть возможные ответы и попробовать новую сетку.</p>
+      <dl>
+        <div><dt>Заполнено</dt><dd>${state.answers.size}/9</dd></div>
+        <div><dt>Ошибки</dt><dd>${state.mistakes}/${MAX_MISTAKES}</dd></div>
+      </dl>
+      <button class="share-button" type="button" data-share-result>Поделиться</button>
+    `;
+  }
   resultPanel.hidden = false;
+}
+
+function shareText() {
+  const dateText = formatDate(state.puzzle.id);
+  const title = dateText ? `Ветки в клетке, ${dateText}` : "Ветки в клетке";
+  const cells = Array.from({ length: 9 }, (_, index) => (index < state.answers.size ? "🟩" : "⬜"));
+  const gridRows = [cells.slice(0, 3).join(""), cells.slice(3, 6).join(""), cells.slice(6, 9).join("")].join("\n");
+  return `${title}: у меня ${state.answers.size} станций из 9, ${state.mistakes} ошибок.\n${gridRows}\n${SHARE_URL}`;
+}
+
+async function shareResult() {
+  const text = shareText();
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: "Ветки в клетке", text });
+      return;
+    }
+
+    await navigator.clipboard.writeText(text);
+    message.textContent = "Результат скопирован.";
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      message.textContent = "Не удалось поделиться результатом.";
+      console.error(error);
+    }
+  }
 }
 
 function matchingStations(rowIndex, columnIndex) {
@@ -482,6 +527,14 @@ function startPuzzle(seedText) {
   renderGrid();
   renderPuzzleDate(seedText);
   selectCell(0, 0);
+  saveGameState();
+}
+
+function dateSeedFromDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function formatDate(seedText) {
@@ -492,16 +545,142 @@ function formatDate(seedText) {
   return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(date);
 }
 
-function localDateSeed(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function dateFromSeed(seedText) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(seedText);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day));
+}
+
+function addDays(seedText, days) {
+  const date = dateFromSeed(seedText);
+  if (!date) return "";
+  date.setDate(date.getDate() + days);
+  return dateSeedFromDate(date);
+}
+
+function currentPuzzleSeed(date = new Date()) {
+  const moscowParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: DAILY_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  })
+    .formatToParts(date)
+    .reduce((parts, part) => {
+      parts[part.type] = part.value;
+      return parts;
+    }, {});
+
+  let seed = `${moscowParts.year}-${moscowParts.month}-${moscowParts.day}`;
+  if (Number(moscowParts.hour) < DAILY_ROLLOVER_HOUR) {
+    seed = addDays(seed, -1);
+  }
+  return seed;
 }
 
 function renderPuzzleDate(seedText) {
   const dateText = formatDate(seedText);
   puzzleDate.textContent = dateText ? `Сетка ${dateText}` : "Тренировочная сетка";
+}
+
+function renderArchive() {
+  archiveList.innerHTML = "";
+  const currentSeed = currentPuzzleSeed();
+  let seed = addDays(currentSeed, -1);
+  const archiveSeeds = [];
+  while (seed && seed >= ARCHIVE_START_DATE) {
+    archiveSeeds.push(seed);
+    seed = addDays(seed, -1);
+  }
+
+  if (!archiveSeeds.length) {
+    archiveList.innerHTML = '<p class="muted">Архив появится после первой смены дневной сетки.</p>';
+    return;
+  }
+
+  for (const archiveSeed of archiveSeeds) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "archive-button secondary-button";
+    button.dataset.archiveSeed = archiveSeed;
+    button.textContent = formatDate(archiveSeed);
+    archiveList.append(button);
+  }
+}
+
+function stationById(id) {
+  return state.data.stations.find((station) => station.id === id);
+}
+
+function saveGameState() {
+  const saved = {
+    puzzleDay: currentPuzzleSeed(),
+    puzzleId: state.puzzle?.id,
+    answers: [...state.answers.entries()].map(([key, station]) => [key, station.id]),
+    mistakes: state.mistakes,
+    finished: state.finished,
+    trainingPuzzlesUsed: state.trainingPuzzlesUsed,
+  };
+  localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify(saved));
+}
+
+function restoreGameState() {
+  const raw = localStorage.getItem(GAME_STORAGE_KEY);
+  if (!raw) return false;
+
+  try {
+    const saved = JSON.parse(raw);
+    if (saved.puzzleDay !== currentPuzzleSeed() || !saved.puzzleId) return false;
+
+    state.puzzle = buildPuzzle(saved.puzzleId);
+    state.answers.clear();
+    for (const [key, stationId] of saved.answers ?? []) {
+      const station = stationById(stationId);
+      if (station) {
+        state.answers.set(key, station);
+      }
+    }
+    state.mistakes = Math.min(Number(saved.mistakes) || 0, MAX_MISTAKES);
+    state.finished = Boolean(saved.finished);
+    state.trainingPuzzlesUsed = Math.min(Number(saved.trainingPuzzlesUsed) || 0, TRAINING_PUZZLE_LIMIT);
+    searchInput.disabled = state.finished;
+    possibleAnswers.hidden = true;
+    resultPanel.hidden = true;
+    resultPanel.innerHTML = "";
+    message.textContent = "";
+    renderGrid();
+    renderPuzzleDate(saved.puzzleId);
+    if (state.finished) {
+      renderResult(state.answers.size === 9 && state.mistakes < MAX_MISTAKES);
+      activeCellTitle.textContent = state.answers.size === 9 ? "Сетка заполнена" : "Партия завершена";
+      activeCellClues.textContent =
+        state.answers.size === 9 ? "Теперь можно нажимать на клетки и смотреть возможные ответы." : "Три ошибки уже использованы.";
+      return true;
+    }
+    selectNextCell();
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+function startTrainingPuzzle() {
+  if (state.trainingPuzzlesUsed >= TRAINING_PUZZLE_LIMIT) {
+    message.textContent = "Сегодня уже использованы две тренировочные сетки.";
+    updateTrainingButton();
+    return;
+  }
+  state.trainingPuzzlesUsed += 1;
+  startPuzzle(`training-${currentPuzzleSeed()}-${state.trainingPuzzlesUsed}-${Date.now()}`);
+}
+
+function startArchivedPuzzle(seedText) {
+  startPuzzle(seedText);
+  message.textContent = "Открыта архивная сетка.";
 }
 
 function showRules() {
@@ -514,7 +693,12 @@ async function init() {
   const response = await fetch(DATA_URL);
   if (!response.ok) throw new Error(`Не удалось загрузить ${DATA_URL}`);
   state.data = await response.json();
-  startPuzzle(localDateSeed());
+  renderArchive();
+  if (!restoreGameState()) {
+    state.trainingPuzzlesUsed = 0;
+    startPuzzle(currentPuzzleSeed());
+  }
+  scheduleDailyRollover();
   if (!localStorage.getItem(RULES_STORAGE_KEY)) {
     showRules();
     localStorage.setItem(RULES_STORAGE_KEY, "1");
@@ -522,8 +706,40 @@ async function init() {
 }
 
 searchInput.addEventListener("input", showSuggestions);
-newPuzzleButton.addEventListener("click", () => startPuzzle(`training-${Date.now()}`));
+newPuzzleButton.addEventListener("click", startTrainingPuzzle);
 helpButton.addEventListener("click", showRules);
+archiveList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-archive-seed]");
+  if (button) {
+    startArchivedPuzzle(button.dataset.archiveSeed);
+  }
+});
+resultPanel.addEventListener("click", (event) => {
+  if (event.target.closest("[data-share-result]")) {
+    shareResult();
+  }
+});
+
+function scheduleDailyRollover() {
+  const now = new Date();
+  const currentSeed = currentPuzzleSeed(now);
+  const nextSeed = addDays(currentSeed, 1);
+  const nextNoon = new Date(`${nextSeed}T09:00:00.000Z`);
+
+  window.setTimeout(() => {
+    const newSeed = currentPuzzleSeed();
+    const previousSeed = addDays(newSeed, -1);
+    renderArchive();
+    state.trainingPuzzlesUsed = 0;
+    if (state.puzzle?.id === previousSeed) {
+      startPuzzle(newSeed);
+    } else {
+      updateTrainingButton();
+      saveGameState();
+    }
+    scheduleDailyRollover();
+  }, nextNoon.getTime() - now.getTime());
+}
 
 init().catch((error) => {
   message.textContent = "Не удалось загрузить данные. Запусти scripts/build_game_data.py.";

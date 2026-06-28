@@ -112,6 +112,13 @@ button:hover {
   border-color: var(--accent-dark);
 }
 
+button:disabled {
+  border-color: var(--line);
+  background: #e7ebf1;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .secondary-button {
   border-color: var(--line);
   background: var(--panel);
@@ -352,10 +359,24 @@ button:hover {
   line-height: 1.35;
 }
 
+.perfect-badge {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0 0 10px;
+  border: 1px solid #bfe8cd;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #e8f7ee;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+}
+
 .result-panel dl {
   display: grid;
   gap: 8px;
-  margin: 0;
+  margin: 0 0 14px;
 }
 
 .result-panel div {
@@ -374,6 +395,10 @@ button:hover {
 .result-panel dd {
   margin: 0;
   font-weight: 850;
+}
+
+.share-button {
+  width: 100%;
 }
 
 .possible-answers {
@@ -491,6 +516,22 @@ button:hover {
   line-height: 1.1;
 }
 
+.archive-panel {
+  grid-column: 1 / -1;
+}
+
+.archive-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.archive-button {
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
 details {
   border-top: 1px solid var(--line);
   padding: 12px 0;
@@ -521,7 +562,7 @@ details p {
   line-height: 1.4;
 }
 
-.changelog-list li {
+.changelog-list > li {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
@@ -529,6 +570,19 @@ details p {
 .changelog-list time {
   color: var(--ink);
   font-weight: 850;
+}
+
+.changelog-list ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+.changelog-list ul li {
+  padding: 0;
+  border: 0;
 }
 
 @media (max-width: 900px) {
